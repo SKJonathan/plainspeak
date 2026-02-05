@@ -14,7 +14,152 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      captured_moments: {
+        Row: {
+          audio_url: string | null
+          created_at: string
+          duration_seconds: number | null
+          id: string
+          transcript: string
+          user_id: string
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          transcript: string
+          user_id: string
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          transcript?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      jargon_terms: {
+        Row: {
+          created_at: string
+          explanation: string
+          id: string
+          moment_id: string
+          term: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          explanation: string
+          id?: string
+          moment_id: string
+          term: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          explanation?: string
+          id?: string
+          moment_id?: string
+          term?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jargon_terms_moment_id_fkey"
+            columns: ["moment_id"]
+            isOneToOne: false
+            referencedRelation: "captured_moments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          explanation_style: Database["public"]["Enums"]["explanation_style"]
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          explanation_style?: Database["public"]["Enums"]["explanation_style"]
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          explanation_style?: Database["public"]["Enums"]["explanation_style"]
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      saved_terms: {
+        Row: {
+          created_at: string
+          id: string
+          jargon_term_id: string
+          subject_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          jargon_term_id: string
+          subject_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          jargon_term_id?: string
+          subject_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_terms_jargon_term_id_fkey"
+            columns: ["jargon_term_id"]
+            isOneToOne: false
+            referencedRelation: "jargon_terms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_terms_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subjects: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +168,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      explanation_style: "eli5" | "teen" | "academic"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +295,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      explanation_style: ["eli5", "teen", "academic"],
+    },
   },
 } as const
