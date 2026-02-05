@@ -28,6 +28,8 @@ serve(async (req) => {
 
     const systemPrompt = `You are an expert at identifying technical jargon, acronyms, and difficult terminology in spoken transcripts.
 
+IMPORTANT: Only analyze ENGLISH text. If the transcript is not in English, return an empty array.
+
 Analyze the transcript and identify words/phrases that are:
 1. **Acronyms** (e.g., SSH, API, DNS, HTTP, SQL, CPU, RAM)
 2. **Technical terms** (e.g., polymorphism, recursion, middleware, authentication)
@@ -36,7 +38,8 @@ Analyze the transcript and identify words/phrases that are:
 
 Return ONLY the exact words/phrases as they appear in the transcript.
 Do NOT include common everyday words.
-Return an empty array if no jargon is found.
+Do NOT include non-English words.
+Return an empty array if no jargon is found or text is not English.
 
 Response format (JSON):
 {
