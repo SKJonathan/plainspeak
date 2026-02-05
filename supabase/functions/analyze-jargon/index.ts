@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,6 +30,9 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
     const stylePrompts: Record<string, string> = {
       eli5: "Explain like you're talking to a 5-year-old. Use simple words, everyday examples, and avoid any technical language.",
       teen: "Explain clearly for a high school student. Use accessible language but include some proper terminology.",
@@ -41,27 +43,28 @@ serve(async (req) => {
 
     const systemPrompt = `You are an expert at identifying technical jargon, acronyms, and specialized terminology in educational content like lectures.
 
+IMPORTANT: Only analyze ENGLISH text. If the transcript is not in English or contains mostly non-English content, return an empty terms array.
+
 Your task is to:
 1. Analyze the transcript and identify 2-7 items that might confuse students, including:
    - **Acronyms** (e.g., SSH, API, DNS, HTTP, SQL, RAM, CPU) - ALWAYS explain what they stand for
    - **Technical terms** (e.g., polymorphism, recursion, latency)
    - **Domain-specific jargon** (e.g., amortized, idempotent, middleware)
    - **Abbreviations** (e.g., repo, config, env)
-2. For each term, provide a clear explanation
+2. For each term, provide a clear explanation in English
 
 IMPORTANT: Pay special attention to acronyms - they are often the most confusing for students. If you see any capitalized abbreviations (2-5 letters), include them.
 
 ${styleInstruction}
 
-Respond ONLY with a JSON object in this exact format:
+Respond with a JSON object:
 {
   "terms": [
-    { "term": "SSH", "explanation": "Secure Shell - a protocol for securely connecting to remote computers over a network" },
-    { "term": "example term", "explanation": "Clear explanation of the term" }
+    { "term": "SSH", "explanation": "Secure Shell - a protocol for securely connecting to remote computers over a network" }
   ]
 }
 
-If there are no technical terms worth explaining, return: { "terms": [] }`;
+If there are no technical terms or the text is not English, return: { "terms": [] }`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -105,39 +108,56 @@ If there are no technical terms worth explaining, return: { "terms": [] }`;
     let parsedTerms: { terms: JargonTerm[] };
     try {
       parsedTerms = JSON.parse(content);
-    } catch (parseError) {
+    } catch {
       console.error("Failed to parse AI response:", content);
       parsedTerms = { terms: [] };
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
     const savedTerms: Array<JargonTerm & { id: string }> = [];
-    
-    if (parsedTerms.terms && parsedTerms.terms.length > 0) {
-      const { data: moment } = await supabase
-        .from("captured_moments")
-        .select("user_id")
-        .eq("id", momentId)
-        .single();
 
-      if (moment) {
+    if (parsedTerms.terms && parsedTerms.terms.length > 0) {
+      // Get user_id from the moment using REST API
+      const momentRes = await fetch(
+        `${supabaseUrl}/rest/v1/captured_moments?id=eq.${momentId}&select=user_id`,
+        {
+          headers: {
+            apikey: supabaseServiceKey,
+            Authorization: `Bearer ${supabaseServiceKey}`,
+          },
+        }
+      );
+
+      const momentData = await momentRes.json();
+      const userId = momentData?.[0]?.user_id;
+
+      if (userId) {
+        // Insert terms one by one using REST API
         for (const term of parsedTerms.terms) {
-          const { data, error } = await supabase
-            .from("jargon_terms")
-            .insert({
+          const insertRes = await fetch(`${supabaseUrl}/rest/v1/jargon_terms`, {
+            method: "POST",
+            headers: {
+              apikey: supabaseServiceKey,
+              Authorization: `Bearer ${supabaseServiceKey}`,
+              "Content-Type": "application/json",
+              Prefer: "return=representation",
+            },
+            body: JSON.stringify({
               moment_id: momentId,
-              user_id: moment.user_id,
+              user_id: userId,
               term: term.term,
               explanation: term.explanation,
-            })
-            .select()
-            .single();
+            }),
+          });
 
-          if (!error && data) {
-            savedTerms.push({ id: data.id, term: data.term, explanation: data.explanation });
+          if (insertRes.ok) {
+            const insertedData = await insertRes.json();
+            if (insertedData?.[0]) {
+              savedTerms.push({
+                id: insertedData[0].id,
+                term: insertedData[0].term,
+                explanation: insertedData[0].explanation,
+              });
+            }
           }
         }
       }
