@@ -5,13 +5,15 @@ import { cn } from "@/lib/utils";
 interface RecordingButtonProps {
   isListening: boolean;
   isCapturing: boolean;
+  isConnecting?: boolean;
   onTap: () => void;
   disabled?: boolean;
 }
 
 export function RecordingButton({ 
   isListening, 
-  isCapturing, 
+  isCapturing,
+  isConnecting = false,
   onTap, 
   disabled 
 }: RecordingButtonProps) {
@@ -52,7 +54,7 @@ export function RecordingButton({
       {/* Main button */}
       <motion.button
         onClick={onTap}
-        disabled={disabled}
+        disabled={disabled || isConnecting}
         whileTap={{ scale: 0.95 }}
         className={cn(
           "relative z-10 flex h-32 w-32 items-center justify-center rounded-full shadow-lg transition-colors focus:outline-none focus:ring-4 focus:ring-primary/30",
@@ -60,8 +62,10 @@ export function RecordingButton({
             ? "bg-recording text-white"
             : isListening
               ? "bg-primary text-primary-foreground"
-              : "bg-muted text-muted-foreground",
-          disabled && "opacity-50 cursor-not-allowed"
+              : isConnecting
+                ? "bg-muted/80 text-muted-foreground animate-pulse"
+                : "bg-muted text-muted-foreground",
+          (disabled || isConnecting) && "opacity-50 cursor-not-allowed"
         )}
       >
         {isCapturing ? (
@@ -85,7 +89,9 @@ export function RecordingButton({
             ? "Capturing..." 
             : isListening 
               ? "Tap to capture moment" 
-              : "Tap to start listening"}
+              : isConnecting
+                ? "Connecting..."
+                : "Tap to start listening"}
         </p>
       </div>
     </div>
