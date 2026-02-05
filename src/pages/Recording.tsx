@@ -89,14 +89,11 @@ export default function Recording() {
 
       toast({
         title: "Moment captured!",
-        description: "Analyzing for jargon terms...",
+        description: "You can review it later in Moments.",
       });
 
-      // Clear transcript and navigate to moment details
+      // Clear transcript but stay on recording page
       clearTranscript();
-      
-      // Trigger jargon analysis (will be added later)
-      navigate(`/moments/${data.id}`);
       
     } catch (err) {
       console.error("Failed to save moment:", err);
