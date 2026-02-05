@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 interface JargonTerm {
@@ -30,7 +31,6 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Get style instructions
     const stylePrompts: Record<string, string> = {
       eli5: "Explain like you're talking to a 5-year-old. Use simple words, everyday examples, and avoid any technical language.",
       teen: "Explain clearly for a high school student. Use accessible language but include some proper terminology.",
@@ -70,11 +70,12 @@ If there are no technical terms worth explaining, return: { "terms": [] }`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Analyze this lecture transcript for jargon:\n\n${transcript}` },
         ],
+        response_format: { type: "json_object" },
       }),
     });
 
@@ -101,33 +102,21 @@ If there are no technical terms worth explaining, return: { "terms": [] }`;
       throw new Error("No response from AI");
     }
 
-    // Parse the JSON response
     let parsedTerms: { terms: JargonTerm[] };
     try {
-      // Extract JSON from potential markdown code blocks
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
-      parsedTerms = JSON.parse(jsonMatch[1].trim());
+      parsedTerms = JSON.parse(content);
     } catch (parseError) {
       console.error("Failed to parse AI response:", content);
       parsedTerms = { terms: [] };
     }
 
-    // Get auth context
-    const authHeader = req.headers.get("Authorization");
-    
-    // Create Supabase client for database operations
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Save terms to database
     const savedTerms: Array<JargonTerm & { id: string }> = [];
     
     if (parsedTerms.terms && parsedTerms.terms.length > 0) {
-      // Get user ID from the moment
-      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-      const supabase = createClient(supabaseUrl, supabaseKey);
-
-      // Get the moment to find user_id
       const { data: moment } = await supabase
         .from("captured_moments")
         .select("user_id")

@@ -135,14 +135,14 @@ export default function Recording() {
 
       {/* Error display */}
       {error && (
-        <Alert variant="destructive" className="mx-auto max-w-sm">
+        <Alert variant="destructive" className="mx-auto max-w-sm mt-4">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {/* Transcript preview */}
-      <div className="w-full max-w-md flex-1 overflow-hidden py-6">
+      <div className="w-full max-w-md flex-1 overflow-y-auto py-6">
         {(transcript || interimTranscript) && (
           <ClickableTranscript
             transcript={transcript}
@@ -163,7 +163,7 @@ export default function Recording() {
       </div>
 
       {/* Recording button */}
-      <div className="pb-8">
+      <div className="pb-4 flex-shrink-0">
         <RecordingButton
           isListening={isListening}
           isCapturing={isCapturing}
@@ -173,15 +173,15 @@ export default function Recording() {
       </div>
 
       {/* Instructions */}
-      <div className="text-center text-xs text-muted-foreground">
+      <div className="text-center text-xs text-muted-foreground pb-4 flex-shrink-0">
         {isCapturing ? (
           <p>Recording for 15 seconds... Tap again to stop early</p>
         ) : isListening ? (
           <p>Tap any word to see its meaning • Tap button to capture moment</p>
         ) : isConnecting ? (
-          <p>Setting up ElevenLabs transcription...</p>
+          <p>Setting up transcription...</p>
         ) : (
-          <p>Start listening to buffer your lecture in the background</p>
+          <p>Start listening to buffer your lecture</p>
         )}
       </div>
     </div>
