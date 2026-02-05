@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BookOpen, Search, Trash2, FolderOpen } from "lucide-react";
+import { BookOpen, Search, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { WordExplanationDialog } from "@/components/recording/WordExplanationDialog";
 
 interface SavedTerm {
   id: string;
@@ -22,6 +23,13 @@ export default function Library() {
   const [savedTerms, setSavedTerms] = useState<SavedTerm[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTerm, setSelectedTerm] = useState<{ term: string; explanation: string } | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const handleTermClick = useCallback((term: string, explanation: string) => {
+    setSelectedTerm({ term, explanation });
+    setDialogOpen(true);
+  }, []);
 
   useEffect(() => {
     async function fetchLibrary() {
@@ -114,9 +122,12 @@ export default function Library() {
               <Card key={item.id}>
                 <CardContent className="p-4">
                   <div className="mb-2 flex items-start justify-between">
-                    <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+                    <button
+                      onClick={() => handleTermClick(item.jargon_terms?.term, item.jargon_terms?.explanation)}
+                      className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+                    >
                       {item.jargon_terms?.term}
-                    </span>
+                    </button>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -126,13 +137,25 @@ export default function Library() {
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p 
+                    onClick={() => handleTermClick(item.jargon_terms?.term, item.jargon_terms?.explanation)}
+                    className="text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                  >
                     {item.jargon_terms?.explanation}
                   </p>
                 </CardContent>
               </Card>
             ))}
           </div>
+
+          <WordExplanationDialog
+            open={dialogOpen}
+            onOpenChange={setDialogOpen}
+            word={selectedTerm?.term || ""}
+            explanation={selectedTerm?.explanation || null}
+            isLoading={false}
+            isJargon={true}
+          />
 
           {filteredTerms.length === 0 && searchQuery && (
             <div className="py-8 text-center text-muted-foreground">

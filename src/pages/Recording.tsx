@@ -7,7 +7,7 @@ import { ClickableTranscript } from "@/components/recording/ClickableTranscript"
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { AlertCircle, Wifi, Sparkles } from "lucide-react";
+import { AlertCircle, Wifi, Sparkles, Square } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Recording() {
@@ -40,24 +40,7 @@ export default function Recording() {
     detectionIntervalMs: 5000,
   });
 
-  const handleCapture = useCallback(async () => {
-    if (!isListening && !isConnecting) {
-      // Start listening
-      await startListening();
-      return;
-    }
-
-    if (isCapturing) {
-      // Stop capturing early
-      if (captureTimeout) {
-        clearTimeout(captureTimeout);
-        setCaptureTimeout(null);
-      }
-      await saveCapture();
-      return;
-    }
-
-    // Start capture - get buffer + continue for 15 more seconds
+  const startCapture = useCallback(() => {
     setIsCapturing(true);
     
     const timeout = setTimeout(async () => {
@@ -65,7 +48,15 @@ export default function Recording() {
     }, 15000);
     
     setCaptureTimeout(timeout);
-  }, [isListening, isConnecting, isCapturing, captureTimeout, startListening]);
+  }, []);
+
+  const cancelCapture = useCallback(() => {
+    if (captureTimeout) {
+      clearTimeout(captureTimeout);
+      setCaptureTimeout(null);
+    }
+    setIsCapturing(false);
+  }, [captureTimeout]);
 
   const saveCapture = async () => {
     setIsCapturing(false);
@@ -162,22 +153,55 @@ export default function Recording() {
         )}
       </div>
 
-      {/* Recording button */}
-      <div className="pb-4 flex-shrink-0">
-        <RecordingButton
-          isListening={isListening}
-          isCapturing={isCapturing}
-          isConnecting={isConnecting}
-          onTap={handleCapture}
-        />
+      {/* Recording controls */}
+      <div className="pb-4 flex-shrink-0 flex flex-col items-center gap-4">
+        {!isListening && !isConnecting ? (
+          <RecordingButton
+            isListening={false}
+            isCapturing={false}
+            isConnecting={isConnecting}
+            onTap={startListening}
+          />
+        ) : isCapturing ? (
+          <div className="flex gap-3">
+            <button
+              onClick={saveCapture}
+              className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-medium text-primary-foreground shadow-lg transition-transform active:scale-95"
+            >
+              <Square className="h-4 w-4 fill-current" />
+              Stop & Save
+            </button>
+            <button
+              onClick={cancelCapture}
+              className="flex items-center gap-2 rounded-full bg-muted px-6 py-3 font-medium text-muted-foreground shadow transition-transform active:scale-95"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-4">
+            <RecordingButton
+              isListening={true}
+              isCapturing={false}
+              isConnecting={false}
+              onTap={startCapture}
+            />
+            <button
+              onClick={stopListening}
+              className="text-sm text-muted-foreground underline"
+            >
+              Stop listening
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Instructions */}
       <div className="text-center text-xs text-muted-foreground pb-4 flex-shrink-0">
         {isCapturing ? (
-          <p>Recording for 15 seconds... Tap again to stop early</p>
+          <p>Capturing moment... Tap Stop & Save when ready</p>
         ) : isListening ? (
-          <p>Tap any word to see its meaning • Tap button to capture moment</p>
+          <p>Tap any word to see its meaning • Tap mic to capture moment</p>
         ) : isConnecting ? (
           <p>Setting up transcription...</p>
         ) : (
