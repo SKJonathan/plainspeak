@@ -39,17 +39,24 @@ serve(async (req) => {
 
     const styleInstruction = stylePrompts[explanationStyle] || stylePrompts.teen;
 
-    const systemPrompt = `You are an expert at identifying technical jargon and specialized terminology in educational content like lectures.
+    const systemPrompt = `You are an expert at identifying technical jargon, acronyms, and specialized terminology in educational content like lectures.
 
 Your task is to:
-1. Analyze the transcript and identify 2-5 technical terms, jargon, or concepts that might be confusing to students
+1. Analyze the transcript and identify 2-7 items that might confuse students, including:
+   - **Acronyms** (e.g., SSH, API, DNS, HTTP, SQL, RAM, CPU) - ALWAYS explain what they stand for
+   - **Technical terms** (e.g., polymorphism, recursion, latency)
+   - **Domain-specific jargon** (e.g., amortized, idempotent, middleware)
+   - **Abbreviations** (e.g., repo, config, env)
 2. For each term, provide a clear explanation
+
+IMPORTANT: Pay special attention to acronyms - they are often the most confusing for students. If you see any capitalized abbreviations (2-5 letters), include them.
 
 ${styleInstruction}
 
 Respond ONLY with a JSON object in this exact format:
 {
   "terms": [
+    { "term": "SSH", "explanation": "Secure Shell - a protocol for securely connecting to remote computers over a network" },
     { "term": "example term", "explanation": "Clear explanation of the term" }
   ]
 }
