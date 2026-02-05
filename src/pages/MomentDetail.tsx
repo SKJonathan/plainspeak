@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { ArrowLeft, Sparkles, Trash2, Loader2, Bookmark, BookmarkCheck } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { WordExplanationDialog } from "@/components/recording/WordExplanationDialog";
+import { cn } from "@/lib/utils";
 
 interface JargonTerm {
   id: string;
@@ -30,6 +32,17 @@ export default function MomentDetail() {
   const [savedTermIds, setSavedTermIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  
+  // Word explanation state
+  const [selectedWord, setSelectedWord] = useState<string | null>(null);
+  const [wordExplanation, setWordExplanation] = useState<string | null>(null);
+  const [isWordJargon, setIsWordJargon] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [loadingExplanation, setLoadingExplanation] = useState(false);
+  const [explanationCache, setExplanationCache] = useState<Map<string, string>>(new Map());
+
+  // Get set of jargon terms for highlighting
+  const jargonTermSet = new Set(jargonTerms.map(t => t.term.toLowerCase()));
 
   useEffect(() => {
     async function fetchData() {
@@ -153,6 +166,90 @@ export default function MomentDetail() {
     }
   };
 
+  const handleWordClick = useCallback(async (word: string) => {
+    const cleanWord = word.replace(/[.,!?;:'"]/g, "").trim();
+    if (!cleanWord) return;
+
+    setSelectedWord(cleanWord);
+    setDialogOpen(true);
+
+    // Check cache first
+    const cached = explanationCache.get(cleanWord.toLowerCase());
+    if (cached) {
+      setWordExplanation(cached);
+      setIsWordJargon(true);
+      setLoadingExplanation(false);
+      return;
+    }
+
+    // Check if it's in the analyzed jargon terms
+    const existingTerm = jargonTerms.find(
+      t => t.term.toLowerCase() === cleanWord.toLowerCase()
+    );
+    if (existingTerm) {
+      setWordExplanation(existingTerm.explanation);
+      setIsWordJargon(true);
+      setLoadingExplanation(false);
+      setExplanationCache(prev => new Map(prev).set(cleanWord.toLowerCase(), existingTerm.explanation));
+      return;
+    }
+
+    // Fetch explanation from API
+    setLoadingExplanation(true);
+    setWordExplanation(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("explain-word", {
+        body: { word: cleanWord, context: moment?.transcript },
+      });
+
+      if (error) throw error;
+
+      setWordExplanation(data.explanation);
+      setIsWordJargon(data.isJargon);
+      
+      if (data.explanation) {
+        setExplanationCache(prev => new Map(prev).set(cleanWord.toLowerCase(), data.explanation));
+      }
+    } catch (err) {
+      console.error("Failed to explain word:", err);
+      setWordExplanation(null);
+      setIsWordJargon(false);
+    } finally {
+      setLoadingExplanation(false);
+    }
+  }, [explanationCache, jargonTerms, moment?.transcript]);
+
+  const renderClickableTranscript = () => {
+    if (!moment) return null;
+    
+    const words = moment.transcript.split(/\s+/).filter(Boolean);
+    
+    return (
+      <p className="text-sm leading-relaxed">
+        {words.map((word, index) => {
+          const cleanWord = word.replace(/[.,!?;:'"]/g, "").toLowerCase();
+          const isHighlighted = jargonTermSet.has(cleanWord);
+          
+          return (
+            <span
+              key={index}
+              onClick={() => handleWordClick(word)}
+              className={cn(
+                "cursor-pointer transition-colors rounded px-0.5 -mx-0.5",
+                isHighlighted
+                  ? "bg-primary/20 text-primary font-medium hover:bg-primary/30"
+                  : "hover:bg-muted"
+              )}
+            >
+              {word}{" "}
+            </span>
+          );
+        })}
+      </p>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -187,11 +284,21 @@ export default function MomentDetail() {
           <CardTitle className="text-sm font-medium text-muted-foreground">
             Transcript
           </CardTitle>
+          <p className="text-xs text-muted-foreground">Tap any word to see its meaning</p>
         </CardHeader>
         <CardContent>
-          <p className="text-sm leading-relaxed">{moment.transcript}</p>
+          {renderClickableTranscript()}
         </CardContent>
       </Card>
+
+      <WordExplanationDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        word={selectedWord || ""}
+        explanation={wordExplanation}
+        isLoading={loadingExplanation}
+        isJargon={isWordJargon}
+      />
 
       {/* Analyze button */}
       {jargonTerms.length === 0 && (
