@@ -1,124 +1,134 @@
 
 
-# Implementation Plan: LectureSnap with Web Speech API
+# Real-Time Clickable Jargon Detection
 
 ## Overview
-Build the LectureSnap mobile app using Web Speech API for free, real-time transcription. The app will capture lecture moments, identify jargon, and provide contextual explanations.
+Add AI-powered real-time jargon detection during recording. Words identified as difficult/jargon will be highlighted and tappable - clicking them instantly shows the meaning and lets you save for later review.
 
 ---
 
-## Phase 1: Database & Authentication Setup
+## How It Works
 
-### Database Tables
-Create the following tables in Lovable Cloud:
-
-| Table | Purpose |
-|-------|---------|
-| `profiles` | User settings (explanation style preference) |
-| `captured_moments` | Recorded audio clips with transcripts |
-| `jargon_terms` | Detected terms with explanations |
-| `saved_terms` | User's personal jargon library |
-| `subjects` | Categories for organizing terms |
-
-### Authentication
-- Email/password signup and login
-- Profile creation on first sign-in
-- Protected routes for authenticated users
+1. As transcript appears during recording, each word is analyzed
+2. Difficult words get highlighted (colored/underlined)
+3. Tap any highlighted word to see instant explanation in a popup
+4. Save button in popup adds term to your library for later review
 
 ---
 
-## Phase 2: Core UI Components
+## Technical Approach
 
-### Pages
-1. **Home/Recording** - Main capture interface with big tap button
-2. **Moments** - History of captured moments
-3. **Library** - Saved jargon terms organized by subject
-4. **Focus Mode** - Flashcard review system
-5. **Settings** - Explanation style preference
+### New Edge Function: `explain-word`
+A lightweight function that:
+- Takes a single word/phrase plus surrounding context
+- Uses AI (Gemini Flash) to determine if it's jargon and explain it
+- Returns: `{ isJargon: boolean, explanation: string }`
 
-### Key Components
-- `RecordingButton` - Large, prominent capture button
-- `TranscriptView` - Display with highlighted jargon
-- `JargonCard` - Expandable term explanation card
-- `FlashCard` - Review card for Focus Mode
+### Real-Time Detection Strategy
+Two options considered:
 
----
+| Approach | Pros | Cons |
+|----------|------|------|
+| Batch analysis every few seconds | Fewer API calls | Slight delay |
+| On-demand (tap any word) | No wasted calls, instant UX | User must guess what's jargon |
 
-## Phase 3: Web Speech API Integration
+**Recommended: Hybrid approach**
+- Batch-analyze transcript every 5 seconds to highlight jargon words
+- Tapping ANY word (jargon or not) triggers instant explanation
 
-### Implementation
-- Use `webkitSpeechRecognition` / `SpeechRecognition` API
-- Continuous recognition mode for lecture buffering
-- Store rolling transcript buffer (last 60 seconds)
-- On capture: save buffer + continue recording for 15-20 seconds
+### UI Changes to Recording Page
 
-### Handling
-- Graceful fallback message if browser doesn't support it
-- Auto-restart on recognition end (for continuous mode)
-- Handle interim vs final results
+1. **Clickable Transcript Component**
+   - Split transcript into individual words
+   - Words identified as jargon get highlighted styling
+   - Each word is tappable
 
----
+2. **Word Detail Dialog/Tooltip**
+   - Shows on word tap
+   - Displays: word, explanation, "Save to Library" button
+   - Loading state while fetching explanation
 
-## Phase 4: AI Jargon Detection & Explanation
-
-### Backend Function
-Create an edge function that:
-1. Receives transcript text
-2. Uses Lovable AI (Gemini) to identify technical terms
-3. Generates explanations based on user's preferred style
-4. Returns structured jargon data
-
-### Explanation Styles
-- ELI5: Simple, everyday language
-- Teen: Clear but complete
-- Academic: Formal definitions
+3. **Instant Save Flow**
+   - Creates jargon_term without a moment_id (standalone term)
+   - Adds to saved_terms immediately
 
 ---
 
-## Phase 5: Capacitor Setup
+## Database Changes
 
-### Configuration
-- Initialize Capacitor for iOS/Android
-- Configure for hot-reload during development
-- Set up proper app ID and name
+Modify `jargon_terms` table:
+- Make `moment_id` nullable (terms can exist without a captured moment)
+
+This allows saving individual words during recording without creating a full "moment."
 
 ---
 
-## Technical Details
+## Implementation Steps
 
-### Web Speech API Code Pattern
+1. **Database Migration**
+   - Alter `jargon_terms.moment_id` to be nullable
+
+2. **Create `explain-word` Edge Function**
+   - Fast, single-word explanation endpoint
+   - Uses surrounding context for accuracy
+
+3. **Create `detect-jargon-batch` Edge Function**
+   - Analyzes transcript chunk, returns list of jargon words
+   - Called every 5 seconds during recording
+
+4. **Build `ClickableTranscript` Component**
+   - Renders words as tappable spans
+   - Highlights detected jargon words
+   - Handles tap to show explanation dialog
+
+5. **Build `WordExplanationDialog` Component**
+   - Shows word explanation
+   - Save to library button
+   - Loading/error states
+
+6. **Update Recording Page**
+   - Replace plain transcript with ClickableTranscript
+   - Add periodic jargon detection
+   - Integrate dialog for word taps
+
+7. **Update Library Page**
+   - Show standalone saved terms (no moment attached)
+
+---
+
+## User Flow
+
 ```text
-const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-recognition.continuous = true;
-recognition.interimResults = true;
-recognition.onresult = (event) => { /* handle transcript */ };
+User starts recording
+    |
+    v
+Transcript appears as words (tappable)
+    |
+    v
+Every 5s: AI scans for jargon -> highlights found words
+    |
+    v
+User taps any word
+    |
+    v
+Dialog shows explanation (AI fetches if not cached)
+    |
+    v
+User taps "Save" -> term added to library
 ```
 
-### Edge Function for Jargon Analysis
-- Uses `google/gemini-2.5-flash` for fast, cost-effective processing
-- Prompt engineered for jargon detection in educational context
-- Returns JSON with terms and explanations
-
 ---
 
-## Implementation Order
+## Files to Create/Modify
 
-1. Database schema & RLS policies
-2. Authentication (signup/login)
-3. Basic UI shell with navigation
-4. Web Speech API recording hook
-5. Capture flow & transcript storage
-6. AI jargon detection edge function
-7. Jargon cards & explanations
-8. Library & saved terms
-9. Focus Mode flashcards
-10. Capacitor native setup
-
----
-
-## Upgrade Path
-When ready to improve accuracy:
-- Deepgram integration can replace Web Speech API
-- Same UI, just swap the transcription hook
-- $200 free credit available
+| File | Action |
+|------|--------|
+| `supabase/functions/explain-word/index.ts` | Create |
+| `supabase/functions/detect-jargon-batch/index.ts` | Create |
+| `src/components/recording/ClickableTranscript.tsx` | Create |
+| `src/components/recording/WordExplanationDialog.tsx` | Create |
+| `src/pages/Recording.tsx` | Modify |
+| `src/hooks/useJargonDetection.ts` | Create |
+| `src/pages/Library.tsx` | Modify |
+| Database migration | Create |
 
