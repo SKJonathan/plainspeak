@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useElevenLabsTranscription } from "@/hooks/useElevenLabsTranscription";
 import { RecordingButton } from "@/components/recording/RecordingButton";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,7 +16,7 @@ export default function Recording() {
   
   const {
     isListening,
-    isSupported,
+    isConnecting,
     transcript,
     interimTranscript,
     startListening,
@@ -24,12 +24,12 @@ export default function Recording() {
     getBufferedTranscript,
     clearTranscript,
     error,
-  } = useSpeechRecognition();
+  } = useElevenLabsTranscription();
 
   const handleCapture = useCallback(async () => {
-    if (!isListening) {
+    if (!isListening && !isConnecting) {
       // Start listening
-      startListening();
+      await startListening();
       return;
     }
 
@@ -51,7 +51,7 @@ export default function Recording() {
     }, 15000);
     
     setCaptureTimeout(timeout);
-  }, [isListening, isCapturing, captureTimeout, startListening]);
+  }, [isListening, isConnecting, isCapturing, captureTimeout, startListening]);
 
   const saveCapture = async () => {
     setIsCapturing(false);
@@ -103,27 +103,13 @@ export default function Recording() {
     }
   };
 
-  if (!isSupported) {
-    return (
-      <div className="flex min-h-[80vh] flex-col items-center justify-center p-6">
-        <Alert variant="destructive" className="max-w-sm">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Speech recognition is not supported in this browser. 
-            Please try Chrome, Safari, or Edge.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
   return (
     <div className="flex min-h-[80vh] flex-col items-center justify-between p-6">
       {/* Header */}
       <div className="w-full text-center">
         <h1 className="text-2xl font-bold text-foreground">LectureSnap</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {isListening ? "Listening to your lecture..." : "Ready to capture"}
+          {isConnecting ? "Connecting..." : isListening ? "Listening to your lecture..." : "Ready to capture"}
         </p>
       </div>
 
@@ -159,6 +145,7 @@ export default function Recording() {
         <RecordingButton
           isListening={isListening}
           isCapturing={isCapturing}
+          isConnecting={isConnecting}
           onTap={handleCapture}
         />
       </div>
@@ -169,6 +156,8 @@ export default function Recording() {
           <p>Recording for 15 seconds... Tap again to stop early</p>
         ) : isListening ? (
           <p>Tap the button when you hear something confusing</p>
+        ) : isConnecting ? (
+          <p>Setting up ElevenLabs transcription...</p>
         ) : (
           <p>Start listening to buffer your lecture in the background</p>
         )}
