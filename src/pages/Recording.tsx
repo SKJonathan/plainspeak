@@ -1,11 +1,13 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useElevenLabsTranscription } from "@/hooks/useElevenLabsTranscription";
+import { useJargonDetection } from "@/hooks/useJargonDetection";
 import { RecordingButton } from "@/components/recording/RecordingButton";
+import { ClickableTranscript } from "@/components/recording/ClickableTranscript";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { AlertCircle, Wifi } from "lucide-react";
+import { AlertCircle, Wifi, Sparkles } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Recording() {
@@ -25,6 +27,18 @@ export default function Recording() {
     clearTranscript,
     error,
   } = useElevenLabsTranscription();
+
+  const {
+    detectedJargon,
+    isDetecting,
+    explanationCache,
+    explainWord,
+    isExplaining,
+  } = useJargonDetection({
+    transcript,
+    isListening,
+    detectionIntervalMs: 5000,
+  });
 
   const handleCapture = useCallback(async () => {
     if (!isListening && !isConnecting) {
@@ -111,6 +125,12 @@ export default function Recording() {
         <p className="mt-1 text-sm text-muted-foreground">
           {isConnecting ? "Connecting..." : isListening ? "Listening to your lecture..." : "Ready to capture"}
         </p>
+        {isListening && isDetecting && (
+          <div className="mt-2 flex items-center justify-center gap-1 text-xs text-primary">
+            <Sparkles className="h-3 w-3 animate-pulse" />
+            <span>Detecting jargon...</span>
+          </div>
+        )}
       </div>
 
       {/* Error display */}
@@ -124,12 +144,14 @@ export default function Recording() {
       {/* Transcript preview */}
       <div className="w-full max-w-md flex-1 overflow-hidden py-6">
         {(transcript || interimTranscript) && (
-          <div className="rounded-xl bg-card p-4 shadow-sm">
-            <p className="text-sm text-foreground">
-              {transcript}
-              <span className="text-muted-foreground">{interimTranscript}</span>
-            </p>
-          </div>
+          <ClickableTranscript
+            transcript={transcript}
+            interimTranscript={interimTranscript}
+            detectedJargon={detectedJargon}
+            explanationCache={explanationCache}
+            onExplainWord={explainWord}
+            isExplaining={isExplaining}
+          />
         )}
         
         {isListening && !transcript && !interimTranscript && (
@@ -155,7 +177,7 @@ export default function Recording() {
         {isCapturing ? (
           <p>Recording for 15 seconds... Tap again to stop early</p>
         ) : isListening ? (
-          <p>Tap the button when you hear something confusing</p>
+          <p>Tap any word to see its meaning • Tap button to capture moment</p>
         ) : isConnecting ? (
           <p>Setting up ElevenLabs transcription...</p>
         ) : (

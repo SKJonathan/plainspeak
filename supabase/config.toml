@@ -1,1 +1,7 @@
 project_id = "eocmkehkesqrkrmgovct"
+
+[functions.explain-word]
+verify_jwt = false
+
+[functions.detect-jargon-batch]
+verify_jwt = false

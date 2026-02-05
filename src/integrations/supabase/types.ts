@@ -46,7 +46,7 @@ export type Database = {
           created_at: string
           explanation: string
           id: string
-          moment_id: string
+          moment_id: string | null
           term: string
           user_id: string
         }
@@ -54,7 +54,7 @@ export type Database = {
           created_at?: string
           explanation: string
           id?: string
-          moment_id: string
+          moment_id?: string | null
           term: string
           user_id: string
         }
@@ -62,7 +62,7 @@ export type Database = {
           created_at?: string
           explanation?: string
           id?: string
-          moment_id?: string
+          moment_id?: string | null
           term?: string
           user_id?: string
         }
