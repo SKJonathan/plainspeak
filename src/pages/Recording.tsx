@@ -7,7 +7,7 @@ import { ClickableTranscript } from "@/components/recording/ClickableTranscript"
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { AlertCircle, Wifi, Sparkles, Square } from "lucide-react";
+import { AlertCircle, Wifi, Sparkles } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Recording() {
@@ -151,7 +151,7 @@ export default function Recording() {
       </div>
 
       {/* Recording controls */}
-      <div className="pb-4 flex-shrink-0 flex flex-col items-center gap-4">
+      <div className="pb-4 flex-shrink-0 flex flex-col items-center gap-6">
         {!isListening && !isConnecting ? (
           <RecordingButton
             isListening={false}
@@ -160,19 +160,18 @@ export default function Recording() {
             onTap={startListening}
           />
         ) : isCapturing ? (
-          <div className="flex gap-3">
-            <button
-              onClick={saveCapture}
-              className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-medium text-primary-foreground shadow-lg transition-transform active:scale-95"
-            >
-              <Square className="h-4 w-4 fill-current" />
-              Stop & Save
-            </button>
+          <div className="flex flex-col items-center gap-4">
+            <RecordingButton
+              isListening={true}
+              isCapturing={true}
+              isConnecting={false}
+              onTap={saveCapture}
+            />
             <button
               onClick={cancelCapture}
-              className="flex items-center gap-2 rounded-full bg-muted px-6 py-3 font-medium text-muted-foreground shadow transition-transform active:scale-95"
+              className="mt-8 text-sm text-muted-foreground underline"
             >
-              Cancel
+              Cancel capture
             </button>
           </div>
         ) : (
@@ -185,7 +184,7 @@ export default function Recording() {
             />
             <button
               onClick={stopListening}
-              className="text-sm text-muted-foreground underline"
+              className="mt-8 text-sm text-muted-foreground underline"
             >
               Stop listening
             </button>
