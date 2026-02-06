@@ -7,7 +7,8 @@ import { ClickableTranscript } from "@/components/recording/ClickableTranscript"
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { AlertCircle, Wifi, Sparkles } from "lucide-react";
+import { AlertCircle, Wifi, Sparkles, Square } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type AudioSource = "microphone" | "computer" | "both";
@@ -198,12 +199,15 @@ export default function Recording() {
               isConnecting={false}
               onTap={startCapture}
             />
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={stopListening}
-              className="mt-8 text-sm text-muted-foreground underline"
+              className="mt-6 gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
             >
+              <Square className="h-3.5 w-3.5 fill-current" />
               Stop listening
-            </button>
+            </Button>
           </div>
         )}
       </div>
