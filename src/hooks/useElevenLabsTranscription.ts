@@ -45,6 +45,33 @@ export function useElevenLabsTranscription({ audioSource = "microphone" }: UseEl
     );
   }, []);
 
+  // Use refs for callbacks to keep useScribe options stable
+  const cleanBufferRef = useRef(cleanBuffer);
+  cleanBufferRef.current = cleanBuffer;
+
+  const handlePartial = useCallback((data: { text: string }) => {
+    setInterimTranscript(data.text);
+  }, []);
+
+  const handleCommitted = useCallback((data: { text: string }) => {
+    if (data.text.trim()) {
+      cleanBufferRef.current();
+      transcriptBufferRef.current.push({
+        text: data.text.trim(),
+        timestamp: Date.now(),
+      });
+      setTranscript((prev) => (prev + " " + data.text).trim());
+      setInterimTranscript("");
+    }
+  }, []);
+
+  const scribe = useScribe({
+    modelId: "scribe_v2_realtime",
+    commitStrategy: CommitStrategy.VAD,
+    onPartialTranscript: handlePartial,
+    onCommittedTranscript: handleCommitted,
+  });
+
   // Get transcript from the last N seconds
   const getBufferedTranscript = useCallback((seconds: number = 60) => {
     const cutoff = Date.now() - seconds * 1000;
@@ -59,25 +86,6 @@ export function useElevenLabsTranscription({ audioSource = "microphone" }: UseEl
     setTranscript("");
     setInterimTranscript("");
   }, []);
-
-  const scribe = useScribe({
-    modelId: "scribe_v2_realtime",
-    commitStrategy: CommitStrategy.VAD,
-    onPartialTranscript: (data) => {
-      setInterimTranscript(data.text);
-    },
-    onCommittedTranscript: (data) => {
-      if (data.text.trim()) {
-        cleanBuffer();
-        transcriptBufferRef.current.push({
-          text: data.text.trim(),
-          timestamp: Date.now(),
-        });
-        setTranscript((prev) => (prev + " " + data.text).trim());
-        setInterimTranscript("");
-      }
-    },
-  });
 
   const cleanupStreams = useCallback(() => {
     if (displayStreamRef.current) {
@@ -154,15 +162,11 @@ export function useElevenLabsTranscription({ audioSource = "microphone" }: UseEl
 
       await scribe.connect({
         token: data.token,
-        ...(finalStream
-          ? { stream: finalStream }
-          : {
-              microphone: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-              },
-            }),
+        microphone: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
     } catch (err) {
       console.error("Failed to start transcription:", err);
