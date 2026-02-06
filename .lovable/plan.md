@@ -1,134 +1,37 @@
 
 
-# Real-Time Clickable Jargon Detection
+## Audio Source Setting
 
-## Overview
-Add AI-powered real-time jargon detection during recording. Words identified as difficult/jargon will be highlighted and tappable - clicking them instantly shows the meaning and lets you save for later review.
+Add a new "Audio Source" card to the Settings page with three options, and update the recording logic to use the selected source.
 
----
+### What You'll See
+A new settings card between "Explanation Style" and "Sign out" with three choices:
+- **Microphone** -- Captures your voice only (current default behavior)
+- **Computer Audio** -- Captures system/computer sounds only (e.g., a lecture video playing)
+- **Both** -- Captures microphone and computer audio together
 
-## How It Works
+### Important Limitation
+Computer audio capture only works on **desktop Chrome/Edge** browsers. On Safari, Firefox, and mobile browsers, it will fall back to microphone only. A small note will explain this in the settings.
 
-1. As transcript appears during recording, each word is analyzed
-2. Difficult words get highlighted (colored/underlined)
-3. Tap any highlighted word to see instant explanation in a popup
-4. Save button in popup adds term to your library for later review
+### Technical Details
 
----
+**1. Database Migration**
+- Add a new enum type `audio_source` with values: `microphone`, `computer`, `both`
+- Add an `audio_source` column to the `profiles` table (default: `microphone`)
 
-## Technical Approach
+**2. Settings Page (`src/pages/Settings.tsx`)**
+- Add a new Card with a RadioGroup for audio source selection
+- Fetch and save the `audio_source` preference alongside `explanation_style`
+- Include a small note about browser compatibility
 
-### New Edge Function: `explain-word`
-A lightweight function that:
-- Takes a single word/phrase plus surrounding context
-- Uses AI (Gemini Flash) to determine if it's jargon and explain it
-- Returns: `{ isJargon: boolean, explanation: string }`
+**3. Transcription Hook (`src/hooks/useElevenLabsTranscription.ts`)**
+- Accept an `audioSource` parameter (`microphone | computer | both`)
+- When `computer` or `both`: use `getDisplayMedia({ audio: true, video: true })` to capture system audio
+- When `both`: mix the mic and system audio streams using `AudioContext` + `MediaStreamDestination`
+- When `computer`: use only the system audio stream
+- Pass the resulting stream to the ElevenLabs scribe connection
 
-### Real-Time Detection Strategy
-Two options considered:
-
-| Approach | Pros | Cons |
-|----------|------|------|
-| Batch analysis every few seconds | Fewer API calls | Slight delay |
-| On-demand (tap any word) | No wasted calls, instant UX | User must guess what's jargon |
-
-**Recommended: Hybrid approach**
-- Batch-analyze transcript every 5 seconds to highlight jargon words
-- Tapping ANY word (jargon or not) triggers instant explanation
-
-### UI Changes to Recording Page
-
-1. **Clickable Transcript Component**
-   - Split transcript into individual words
-   - Words identified as jargon get highlighted styling
-   - Each word is tappable
-
-2. **Word Detail Dialog/Tooltip**
-   - Shows on word tap
-   - Displays: word, explanation, "Save to Library" button
-   - Loading state while fetching explanation
-
-3. **Instant Save Flow**
-   - Creates jargon_term without a moment_id (standalone term)
-   - Adds to saved_terms immediately
-
----
-
-## Database Changes
-
-Modify `jargon_terms` table:
-- Make `moment_id` nullable (terms can exist without a captured moment)
-
-This allows saving individual words during recording without creating a full "moment."
-
----
-
-## Implementation Steps
-
-1. **Database Migration**
-   - Alter `jargon_terms.moment_id` to be nullable
-
-2. **Create `explain-word` Edge Function**
-   - Fast, single-word explanation endpoint
-   - Uses surrounding context for accuracy
-
-3. **Create `detect-jargon-batch` Edge Function**
-   - Analyzes transcript chunk, returns list of jargon words
-   - Called every 5 seconds during recording
-
-4. **Build `ClickableTranscript` Component**
-   - Renders words as tappable spans
-   - Highlights detected jargon words
-   - Handles tap to show explanation dialog
-
-5. **Build `WordExplanationDialog` Component**
-   - Shows word explanation
-   - Save to library button
-   - Loading/error states
-
-6. **Update Recording Page**
-   - Replace plain transcript with ClickableTranscript
-   - Add periodic jargon detection
-   - Integrate dialog for word taps
-
-7. **Update Library Page**
-   - Show standalone saved terms (no moment attached)
-
----
-
-## User Flow
-
-```text
-User starts recording
-    |
-    v
-Transcript appears as words (tappable)
-    |
-    v
-Every 5s: AI scans for jargon -> highlights found words
-    |
-    v
-User taps any word
-    |
-    v
-Dialog shows explanation (AI fetches if not cached)
-    |
-    v
-User taps "Save" -> term added to library
-```
-
----
-
-## Files to Create/Modify
-
-| File | Action |
-|------|--------|
-| `supabase/functions/explain-word/index.ts` | Create |
-| `supabase/functions/detect-jargon-batch/index.ts` | Create |
-| `src/components/recording/ClickableTranscript.tsx` | Create |
-| `src/components/recording/WordExplanationDialog.tsx` | Create |
-| `src/pages/Recording.tsx` | Modify |
-| `src/hooks/useJargonDetection.ts` | Create |
-| `src/pages/Library.tsx` | Modify |
-| Database migration | Create |
+**4. Recording Page (`src/pages/Recording.tsx`)**
+- Fetch the user's `audio_source` setting from their profile
+- Pass it to the transcription hook
 
