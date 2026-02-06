@@ -192,7 +192,7 @@ export default function Recording() {
             </button>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-4 pb-4">
             <RecordingButton
               isListening={true}
               isCapturing={false}
@@ -203,7 +203,7 @@ export default function Recording() {
               variant="outline"
               size="sm"
               onClick={stopListening}
-              className="mt-6 gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+              className="mt-10 gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
             >
               <Square className="h-3.5 w-3.5 fill-current" />
               Stop listening
