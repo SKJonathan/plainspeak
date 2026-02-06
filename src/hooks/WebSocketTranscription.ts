@@ -159,10 +159,10 @@ export class WebSocketTranscription {
         binary += String.fromCharCode(bytes[i]);
       }
 
-      // Send as input_audio_chunk per ElevenLabs WebSocket API
+      // Send as audio_input per ElevenLabs WebSocket API
       this.ws.send(JSON.stringify({
-        type: "input_audio_chunk",
-        audio_base_64: btoa(binary),
+        type: "audio_input",
+        data: btoa(binary),
       }));
     };
 
