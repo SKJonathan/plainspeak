@@ -109,7 +109,7 @@ export default function Recording() {
     <div className="flex min-h-[80vh] flex-col items-center justify-between p-6">
       {/* Header */}
       <div className="w-full text-center">
-        <h1 className="text-2xl font-bold text-foreground">LectureSnap</h1>
+        <h1 className="text-2xl font-bold text-foreground">PlainSpeak</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {isConnecting ? "Connecting..." : isListening ? "Listening to your lecture..." : "Ready to capture"}
         </p>
@@ -193,18 +193,18 @@ export default function Recording() {
         )}
       </div>
 
-      {/* Instructions */}
-      <div className="text-center text-xs text-muted-foreground pb-4 flex-shrink-0">
-        {isCapturing ? (
-          <p>Capturing moment... Tap Stop & Save when ready</p>
-        ) : isListening ? (
-          <p>Tap any word to see its meaning • Tap mic to capture moment</p>
-        ) : isConnecting ? (
-          <p>Setting up transcription...</p>
-        ) : (
-          <p>Start listening to buffer your lecture</p>
-        )}
-      </div>
+      {/* Instructions - only show when not in initial state to avoid overlap */}
+      {(isCapturing || isListening || isConnecting) && (
+        <div className="text-center text-xs text-muted-foreground pb-4 flex-shrink-0">
+          {isCapturing ? (
+            <p>Capturing moment... Tap Stop & Save when ready</p>
+          ) : isListening ? (
+            <p>Tap any word to see its meaning • Tap mic to capture moment</p>
+          ) : isConnecting ? (
+            <p>Setting up transcription...</p>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
