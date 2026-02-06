@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useElevenLabsTranscription } from "@/hooks/useElevenLabsTranscription";
 import { useJargonDetection } from "@/hooks/useJargonDetection";
@@ -10,12 +10,28 @@ import { toast } from "@/hooks/use-toast";
 import { AlertCircle, Wifi, Sparkles } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+type AudioSource = "microphone" | "computer" | "both";
+
 export default function Recording() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isCapturing, setIsCapturing] = useState(false);
   const [captureTimeout, setCaptureTimeout] = useState<NodeJS.Timeout | null>(null);
-  
+  const [audioSource, setAudioSource] = useState<AudioSource>("microphone");
+
+  useEffect(() => {
+    async function fetchAudioSource() {
+      if (!user) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("audio_source")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (data?.audio_source) setAudioSource(data.audio_source as AudioSource);
+    }
+    fetchAudioSource();
+  }, [user]);
+
   const {
     isListening,
     isConnecting,
@@ -26,7 +42,7 @@ export default function Recording() {
     getBufferedTranscript,
     clearTranscript,
     error,
-  } = useElevenLabsTranscription();
+  } = useElevenLabsTranscription({ audioSource });
 
   const {
     detectedJargon,

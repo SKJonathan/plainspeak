@@ -2,9 +2,15 @@ import { useState, useRef, useCallback } from "react";
 import { useScribe, CommitStrategy } from "@elevenlabs/react";
 import { supabase } from "@/integrations/supabase/client";
 
+type AudioSource = "microphone" | "computer" | "both";
+
 interface TranscriptEntry {
   text: string;
   timestamp: number;
+}
+
+interface UseElevenLabsTranscriptionOptions {
+  audioSource?: AudioSource;
 }
 
 interface UseElevenLabsTranscriptionReturn {
@@ -19,15 +25,17 @@ interface UseElevenLabsTranscriptionReturn {
   error: string | null;
 }
 
-const BUFFER_DURATION_MS = 60000; // 60 seconds rolling buffer
+const BUFFER_DURATION_MS = 60000;
 
-export function useElevenLabsTranscription(): UseElevenLabsTranscriptionReturn {
+export function useElevenLabsTranscription({ audioSource = "microphone" }: UseElevenLabsTranscriptionOptions = {}): UseElevenLabsTranscriptionReturn {
   const [isConnecting, setIsConnecting] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [interimTranscript, setInterimTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
   
   const transcriptBufferRef = useRef<TranscriptEntry[]>([]);
+  const displayStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   // Clean old entries from buffer
   const cleanBuffer = useCallback(() => {
@@ -71,15 +79,67 @@ export function useElevenLabsTranscription(): UseElevenLabsTranscriptionReturn {
     },
   });
 
+  const cleanupStreams = useCallback(() => {
+    if (displayStreamRef.current) {
+      displayStreamRef.current.getTracks().forEach((t) => t.stop());
+      displayStreamRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+  }, []);
+
   const startListening = useCallback(async () => {
     setIsConnecting(true);
     setError(null);
 
     try {
-      // Request microphone permission
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      let micStream: MediaStream | null = null;
+      let displayStream: MediaStream | null = null;
 
-      // Get token from edge function
+      if (audioSource === "microphone" || audioSource === "both") {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+
+      if (audioSource === "computer" || audioSource === "both") {
+        try {
+          displayStream = await navigator.mediaDevices.getDisplayMedia({
+            audio: true,
+            video: true,
+          });
+          displayStreamRef.current = displayStream;
+          displayStream.getVideoTracks().forEach((t) => t.stop());
+          displayStream.getAudioTracks().forEach((track) => {
+            track.onended = () => {
+              scribe.disconnect();
+              cleanupStreams();
+            };
+          });
+        } catch (displayErr) {
+          console.warn("System audio not available, falling back to mic:", displayErr);
+          if (!micStream) {
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          }
+        }
+      }
+
+      let finalStream: MediaStream | undefined;
+      if (micStream && displayStream?.getAudioTracks().length) {
+        const ctx = new AudioContext();
+        audioContextRef.current = ctx;
+        const dest = ctx.createMediaStreamDestination();
+        ctx.createMediaStreamSource(micStream).connect(dest);
+        ctx.createMediaStreamSource(displayStream).connect(dest);
+        finalStream = dest.stream;
+      } else if (displayStream?.getAudioTracks().length) {
+        finalStream = displayStream;
+      } else if (micStream) {
+        finalStream = micStream;
+      } else {
+        throw new Error("No audio source available");
+      }
+
       const { data, error: fnError } = await supabase.functions.invoke(
         "elevenlabs-scribe-token"
       );
@@ -92,14 +152,17 @@ export function useElevenLabsTranscription(): UseElevenLabsTranscriptionReturn {
         throw new Error("No token received from server");
       }
 
-      // Start the transcription session
       await scribe.connect({
         token: data.token,
-        microphone: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+        ...(finalStream
+          ? { stream: finalStream }
+          : {
+              microphone: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              },
+            }),
       });
     } catch (err) {
       console.error("Failed to start transcription:", err);
@@ -115,11 +178,12 @@ export function useElevenLabsTranscription(): UseElevenLabsTranscriptionReturn {
     } finally {
       setIsConnecting(false);
     }
-  }, [scribe]);
+  }, [scribe, audioSource, cleanupStreams]);
 
   const stopListening = useCallback(() => {
     scribe.disconnect();
-  }, [scribe]);
+    cleanupStreams();
+  }, [scribe, cleanupStreams]);
 
   return {
     isListening: scribe.isConnected,
