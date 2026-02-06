@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +15,30 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  // Auth check
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } }
+  );
+
+  const authToken = authHeader.replace("Bearer ", "");
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(authToken);
+  if (claimsError || !claimsData?.claims) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const userId = claimsData.claims.sub;
 
   try {
     const { transcript, momentId, explanationStyle = "teen" } = await req.json();
@@ -116,48 +141,32 @@ If there are no technical terms or the text is not English, return: { "terms": [
     const savedTerms: Array<JargonTerm & { id: string }> = [];
 
     if (parsedTerms.terms && parsedTerms.terms.length > 0) {
-      // Get user_id from the moment using REST API
-      const momentRes = await fetch(
-        `${supabaseUrl}/rest/v1/captured_moments?id=eq.${momentId}&select=user_id`,
-        {
+      // Use the authenticated user's ID instead of fetching from the moment
+      for (const term of parsedTerms.terms) {
+        const insertRes = await fetch(`${supabaseUrl}/rest/v1/jargon_terms`, {
+          method: "POST",
           headers: {
             apikey: supabaseServiceKey,
             Authorization: `Bearer ${supabaseServiceKey}`,
+            "Content-Type": "application/json",
+            Prefer: "return=representation",
           },
-        }
-      );
+          body: JSON.stringify({
+            moment_id: momentId,
+            user_id: userId,
+            term: term.term,
+            explanation: term.explanation,
+          }),
+        });
 
-      const momentData = await momentRes.json();
-      const userId = momentData?.[0]?.user_id;
-
-      if (userId) {
-        // Insert terms one by one using REST API
-        for (const term of parsedTerms.terms) {
-          const insertRes = await fetch(`${supabaseUrl}/rest/v1/jargon_terms`, {
-            method: "POST",
-            headers: {
-              apikey: supabaseServiceKey,
-              Authorization: `Bearer ${supabaseServiceKey}`,
-              "Content-Type": "application/json",
-              Prefer: "return=representation",
-            },
-            body: JSON.stringify({
-              moment_id: momentId,
-              user_id: userId,
-              term: term.term,
-              explanation: term.explanation,
-            }),
-          });
-
-          if (insertRes.ok) {
-            const insertedData = await insertRes.json();
-            if (insertedData?.[0]) {
-              savedTerms.push({
-                id: insertedData[0].id,
-                term: insertedData[0].term,
-                explanation: insertedData[0].explanation,
-              });
-            }
+        if (insertRes.ok) {
+          const insertedData = await insertRes.json();
+          if (insertedData?.[0]) {
+            savedTerms.push({
+              id: insertedData[0].id,
+              term: insertedData[0].term,
+              explanation: insertedData[0].explanation,
+            });
           }
         }
       }
