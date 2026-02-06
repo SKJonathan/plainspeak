@@ -135,6 +135,8 @@ export function useElevenLabsTranscription({
     setError(null);
     setIsConnecting(true);
 
+    console.log("startListening called", { audioSource, useWsMode, needsSystemAudio, canUseSystemAudio });
+
     if (useWsMode) {
       try {
         let micStream: MediaStream | null = null;
@@ -147,22 +149,41 @@ export function useElevenLabsTranscription({
         try {
           displayStream = await navigator.mediaDevices.getDisplayMedia({
             audio: true,
-            video: { width: 1, height: 1, frameRate: 1 },
+            video: true,
           });
           displayStreamRef.current = displayStream;
-          // Do NOT stop video tracks — Chrome kills audio if video track is stopped
+
+          // Disable video tracks but keep them alive (stopping kills audio in Chrome)
+          displayStream.getVideoTracks().forEach((t) => {
+            t.enabled = false;
+          });
+
+          console.log("Display stream obtained", {
+            audioTracks: displayStream.getAudioTracks().length,
+            videoTracks: displayStream.getVideoTracks().length,
+          });
+
           const wsTx = getWsTranscription();
           displayStream.getAudioTracks().forEach((track) => {
             track.onended = () => {
+              console.log("Display audio track ended");
               wsTx.disconnect();
               cleanupStreams();
               setWsConnected(false);
             };
           });
+
+          if (displayStream.getAudioTracks().length === 0) {
+            throw new Error("No audio track in shared tab. Make sure 'Share audio' is checked.");
+          }
         } catch (displayErr) {
           console.warn("System audio capture failed:", displayErr);
           if (audioSource === "computer") {
-            setError("System audio capture was denied or is not available.");
+            setError(
+              displayErr instanceof Error && displayErr.message.includes("audio track")
+                ? displayErr.message
+                : "System audio capture was denied or is not available. Make sure to check 'Share audio' when sharing a tab."
+            );
             setIsConnecting(false);
             return;
           }
@@ -186,6 +207,7 @@ export function useElevenLabsTranscription({
           return;
         }
 
+        console.log("Connecting WS transcription with stream, audio tracks:", finalStream.getAudioTracks().length);
         await getWsTranscription().connect(finalStream);
       } catch (err) {
         console.error("Failed to start WS transcription:", err);
