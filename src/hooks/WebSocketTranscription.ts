@@ -58,9 +58,9 @@ export class WebSocketTranscription {
       if (fnError) throw new Error(fnError.message || "Failed to get token");
       if (!data?.token) throw new Error("No token received");
 
-      // Pass config as query params per ElevenLabs WebSocket API
+      // Pass all config as query params, including commit_strategy=vad
       const ws = new WebSocket(
-        `wss://api.elevenlabs.io/v1/speech-to-text/realtime?model_id=scribe_v2_realtime&sample_rate=16000&audio_format=pcm_16000&language_code=en&token=${encodeURIComponent(data.token)}`
+        `wss://api.elevenlabs.io/v1/speech-to-text/realtime?model_id=scribe_v2_realtime&sample_rate=16000&audio_format=pcm_16000&language_code=en&commit_strategy=vad&token=${encodeURIComponent(data.token)}`
       );
       this.ws = ws;
 
@@ -121,20 +121,30 @@ export class WebSocketTranscription {
   }
 
   private startAudioCapture(stream: MediaStream) {
-    const audioContext = new AudioContext({ sampleRate: 16000 });
+    // Use the stream's native sample rate, then resample to 16kHz for the API
+    const nativeSampleRate = stream.getAudioTracks()[0]?.getSettings()?.sampleRate || 48000;
+    const targetSampleRate = 16000;
+
+    const audioContext = new AudioContext({ sampleRate: nativeSampleRate });
     this.audioContext = audioContext;
 
     const source = audioContext.createMediaStreamSource(stream);
     const processor = audioContext.createScriptProcessor(4096, 1, 1);
     this.processor = processor;
 
+    const resampleRatio = nativeSampleRate / targetSampleRate;
+
     processor.onaudioprocess = (e) => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
       const inputData = e.inputBuffer.getChannelData(0);
-      const pcm16 = new Int16Array(inputData.length);
-      for (let i = 0; i < inputData.length; i++) {
-        const s = Math.max(-1, Math.min(1, inputData[i]));
+
+      // Downsample to 16kHz
+      const outputLength = Math.floor(inputData.length / resampleRatio);
+      const pcm16 = new Int16Array(outputLength);
+      for (let i = 0; i < outputLength; i++) {
+        const srcIndex = Math.floor(i * resampleRatio);
+        const s = Math.max(-1, Math.min(1, inputData[srcIndex]));
         pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
       }
 
