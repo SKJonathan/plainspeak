@@ -86,7 +86,7 @@ export function RecordingButton({
               : "text-muted-foreground"
         )}>
           {isCapturing 
-            ? "Capturing..." 
+            ? "Tap to save moment" 
             : isListening 
               ? "Tap to capture moment" 
               : isConnecting
