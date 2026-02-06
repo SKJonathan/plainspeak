@@ -71,6 +71,8 @@ export class WebSocketTranscription {
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
+          console.log("WS STT message received:", msg.message_type, msg);
+          
           if (msg.message_type === "session_started") {
             this.isConnected = true;
             this.callbacks.onConnected();
@@ -84,6 +86,9 @@ export class WebSocketTranscription {
               this.buffer.push({ text, timestamp: Date.now() });
               this.callbacks.onCommittedTranscript(text);
             }
+          } else if (msg.message_type?.includes("error")) {
+            console.error("ElevenLabs STT error:", msg);
+            this.callbacks.onError(msg.error || msg.message || "Transcription error");
           }
         } catch (e) {
           console.warn("Failed to parse WS message:", e);
