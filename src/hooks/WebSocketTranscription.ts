@@ -58,19 +58,14 @@ export class WebSocketTranscription {
       if (fnError) throw new Error(fnError.message || "Failed to get token");
       if (!data?.token) throw new Error("No token received");
 
+      // Pass config as query params per ElevenLabs WebSocket API
       const ws = new WebSocket(
-        `wss://api.elevenlabs.io/v1/speech-to-text/realtime?token=${encodeURIComponent(data.token)}`
+        `wss://api.elevenlabs.io/v1/speech-to-text/realtime?model_id=scribe_v2_realtime&sample_rate=16000&audio_format=pcm_16000&language_code=en&token=${encodeURIComponent(data.token)}`
       );
       this.ws = ws;
 
       ws.onopen = () => {
-        ws.send(JSON.stringify({
-          type: "config",
-          model_id: "scribe_v2_realtime",
-          sample_rate: 16000,
-          audio_format: "pcm_16000",
-          commit_strategy: "vad",
-        }));
+        console.log("WS connected to ElevenLabs STT");
       };
 
       ws.onmessage = (event) => {
@@ -149,7 +144,9 @@ export class WebSocketTranscription {
         binary += String.fromCharCode(bytes[i]);
       }
 
+      // Send as input_audio_chunk per ElevenLabs WebSocket API
       this.ws.send(JSON.stringify({
+        type: "input_audio_chunk",
         audio_base_64: btoa(binary),
       }));
     };
