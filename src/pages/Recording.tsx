@@ -184,12 +184,14 @@ export default function Recording() {
               isConnecting={false}
               onTap={saveCapture}
             />
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={cancelCapture}
-              className="mt-8 text-sm text-muted-foreground underline"
+              className="mt-10 gap-2 text-muted-foreground border-muted-foreground/30 hover:bg-muted"
             >
               Cancel capture
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4 pb-4">
