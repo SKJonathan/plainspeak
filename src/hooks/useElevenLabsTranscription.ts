@@ -147,10 +147,10 @@ export function useElevenLabsTranscription({
         try {
           displayStream = await navigator.mediaDevices.getDisplayMedia({
             audio: true,
-            video: true,
+            video: { width: 1, height: 1, frameRate: 1 },
           });
           displayStreamRef.current = displayStream;
-          displayStream.getVideoTracks().forEach((t) => t.stop());
+          // Do NOT stop video tracks — Chrome kills audio if video track is stopped
           const wsTx = getWsTranscription();
           displayStream.getAudioTracks().forEach((track) => {
             track.onended = () => {
