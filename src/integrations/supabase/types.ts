@@ -78,18 +78,21 @@ export type Database = {
       }
       profiles: {
         Row: {
+          audio_source: Database["public"]["Enums"]["audio_source"]
           created_at: string
           explanation_style: Database["public"]["Enums"]["explanation_style"]
           id: string
           updated_at: string
         }
         Insert: {
+          audio_source?: Database["public"]["Enums"]["audio_source"]
           created_at?: string
           explanation_style?: Database["public"]["Enums"]["explanation_style"]
           id: string
           updated_at?: string
         }
         Update: {
+          audio_source?: Database["public"]["Enums"]["audio_source"]
           created_at?: string
           explanation_style?: Database["public"]["Enums"]["explanation_style"]
           id?: string
@@ -168,6 +171,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      audio_source: "microphone" | "computer" | "both"
       explanation_style: "eli5" | "teen" | "academic"
     }
     CompositeTypes: {
@@ -296,6 +300,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      audio_source: ["microphone", "computer", "both"],
       explanation_style: ["eli5", "teen", "academic"],
     },
   },

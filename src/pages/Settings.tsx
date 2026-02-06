@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "@/hooks/use-toast";
-import { LogOut, User, Sparkles, Loader2 } from "lucide-react";
+import { LogOut, User, Sparkles, Loader2, Monitor } from "lucide-react";
 
 type ExplanationStyle = "eli5" | "teen" | "academic";
+type AudioSource = "microphone" | "computer" | "both";
 
 const styleOptions: { value: ExplanationStyle; label: string; description: string }[] = [
   {
@@ -28,9 +29,28 @@ const styleOptions: { value: ExplanationStyle; label: string; description: strin
   },
 ];
 
+const audioSourceOptions: { value: AudioSource; label: string; description: string }[] = [
+  {
+    value: "microphone",
+    label: "Microphone",
+    description: "Captures your voice only",
+  },
+  {
+    value: "computer",
+    label: "Computer Audio",
+    description: "Captures system/computer sounds (e.g., lecture videos)",
+  },
+  {
+    value: "both",
+    label: "Both",
+    description: "Captures microphone and computer audio together",
+  },
+];
+
 export default function Settings() {
   const { user, signOut } = useAuth();
   const [explanationStyle, setExplanationStyle] = useState<ExplanationStyle>("teen");
+  const [audioSource, setAudioSource] = useState<AudioSource>("microphone");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -40,12 +60,13 @@ export default function Settings() {
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("explanation_style")
+        .select("explanation_style, audio_source")
         .eq("id", user.id)
         .maybeSingle();
 
       if (!error && data) {
         setExplanationStyle(data.explanation_style as ExplanationStyle);
+        if (data.audio_source) setAudioSource(data.audio_source as AudioSource);
       }
       setLoading(false);
     }
@@ -62,6 +83,26 @@ export default function Settings() {
     const { error } = await supabase
       .from("profiles")
       .update({ explanation_style: value })
+      .eq("id", user.id);
+
+    setSaving(false);
+
+    if (error) {
+      toast({ title: "Failed to save", variant: "destructive" });
+    } else {
+      toast({ title: "Settings saved!" });
+    }
+  };
+
+  const handleAudioSourceChange = async (value: AudioSource) => {
+    if (!user) return;
+
+    setSaving(true);
+    setAudioSource(value);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ audio_source: value } as any)
       .eq("id", user.id);
 
     setSaving(false);
@@ -149,6 +190,49 @@ export default function Settings() {
               </div>
             ))}
           </RadioGroup>
+        </CardContent>
+      </Card>
+
+      {/* Audio Source */}
+      <Card className="mb-4">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-full bg-accent/10 p-2">
+              <Monitor className="h-4 w-4 text-accent" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Audio Source</CardTitle>
+              <CardDescription className="text-xs">
+                What audio should be transcribed?
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <RadioGroup
+            value={audioSource}
+            onValueChange={(value) => handleAudioSourceChange(value as AudioSource)}
+            className="space-y-3"
+            disabled={saving}
+          >
+            {audioSourceOptions.map((option) => (
+              <div
+                key={option.value}
+                className="flex items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50"
+              >
+                <RadioGroupItem value={option.value} id={`audio-${option.value}`} className="mt-0.5" />
+                <Label htmlFor={`audio-${option.value}`} className="flex-1 cursor-pointer">
+                  <span className="block font-medium">{option.label}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {option.description}
+                  </span>
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Computer audio capture only works on desktop Chrome/Edge. Other browsers will fall back to microphone only.
+          </p>
         </CardContent>
       </Card>
 
